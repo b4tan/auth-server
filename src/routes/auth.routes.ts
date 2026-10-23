@@ -5,9 +5,14 @@ import {
   authController, 
   authMiddleware,
   CsrfMiddleware,
-  ValidationMiddleware
+  ValidationMiddleware,
+  rateLimit
 } from '@container.js';
+import { byEmail } from '@middleware/ratelimit.middleware.js';
+import rateLimitConfig from '@config/ratelimit.config.js';
 import Send from '@utils/logging/response.utils.js';
+
+const { policies } = rateLimitConfig;
 
 class AuthRouter extends BaseRouter {
   protected routes(): RouteConfig[] {
@@ -26,6 +31,8 @@ class AuthRouter extends BaseRouter {
         method: "post",
         path: "/login",
         middleware: [
+          rateLimit('login-ip', policies.loginPerIp),
+          rateLimit('login-email', policies.loginPerEmail, byEmail),
           CsrfMiddleware.verifyCrsfToken,
           ValidationMiddleware.validate(LoginRequest)
         ],
@@ -35,6 +42,7 @@ class AuthRouter extends BaseRouter {
         method: "post",
         path: "/register",
         middleware: [
+          rateLimit('register-ip', policies.registerPerIp),
           CsrfMiddleware.verifyCrsfToken,
           ValidationMiddleware.validate(SignupRequest)
         ],
@@ -53,6 +61,7 @@ class AuthRouter extends BaseRouter {
         method: "post",
         path: "/refresh-token",
         middleware: [
+          rateLimit('refresh-ip', policies.refreshPerIp),
           CsrfMiddleware.verifyCrsfToken,
           authMiddleware.verifyRefreshToken
         ],
@@ -62,6 +71,7 @@ class AuthRouter extends BaseRouter {
         method: "post",
         path: "/verify-email",
         middleware: [
+          rateLimit('verify-ip', policies.verifyPerIp),
           CsrfMiddleware.verifyCrsfToken,
           ValidationMiddleware.validate(VerifyEmailRequest)
         ],
@@ -71,6 +81,8 @@ class AuthRouter extends BaseRouter {
         method: "post",
         path: "/resend-otp",
         middleware: [
+          rateLimit('otp-ip', policies.otpPerIp),
+          rateLimit('otp-email', policies.otpPerEmail, byEmail),
           CsrfMiddleware.verifyCrsfToken,
           ValidationMiddleware.validate(ResendOtpRequest)
         ],

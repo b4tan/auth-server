@@ -19,6 +19,10 @@ class Server {
     this.initRoutes();
   }
   private initMiddleware(): void {
+    // Behind a load balancer, trust its X-Forwarded-For so req.ip (and the rate limits keyed on it) is the real client.
+    if (process.env.TRUST_PROXY) {
+      this.app.set('trust proxy', Number(process.env.TRUST_PROXY));
+    }
     this.app.use(requestIdMiddleware);
     this.app.use(requestLoggerMiddleware);
     

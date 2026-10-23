@@ -24,6 +24,11 @@ logout        ──► session revoked
 - **Passwords** are hashed with Argon2id (64 MB, 3 iterations).
 - **Email OTP**: six digits from a CSPRNG, stored hashed, compared in constant
   time, valid for 15 minutes, with a 30-minute lockout after 3 wrong tries.
+- **Rate limiting**: token buckets in Redis, per IP and per email, on login,
+  signup, OTP and refresh. A Lua script refills and spends a token in one
+  atomic step using Redis' clock, so instances share limits and can't
+  overspend under concurrent requests. Over the limit, the API answers 429
+  with `Retry-After`. Without `REDIS_URL` the buckets live in memory.
 - **CSRF**: double-submit cookie on every state-changing route.
 - **Validation**: every request body is checked with Zod before it reaches a
   controller.
@@ -47,15 +52,27 @@ The code is layered as routes → controllers → services → repositories
 | GET    | `/api/user/me`           | `Authorization: Bearer <access token>`  |
 | GET    | `/health`                |                                         |
 
+| Limit                 | Burst | Then            |
+| --------------------- | ----- | --------------- |
+| login, per IP         | 10    | 10 a minute     |
+| login, per email      | 5     | 1 a minute      |
+| register, per IP      | 5     | 1 a minute      |
+| verify-email, per IP  | 10    | 5 a minute      |
+| resend-otp, per IP    | 5     | 1 a minute      |
+| resend-otp, per email | 3     | 1 every 5 min   |
+| refresh-token, per IP | 30    | 30 a minute     |
+
+Limits live in `src/config/ratelimit.config.ts`.
+
 POST routes need the `X-CSRF-Token` header to match the `csrf-token` cookie.
 
 ## Running it
 
-Needs Node 20+ and PostgreSQL.
+Needs Node 20+, PostgreSQL and Redis (`docker compose up -d` starts both).
 
 ```bash
 npm install
-cp .env.example .env        # fill in DATABASE_URL and SMTP
+cp .env.example .env        # fill in SMTP
 npm run keys                # RSA keypair + refresh pepper in src/keys (gitignored)
 npm run prisma:migrate      # create the tables
 npm run dev
@@ -73,6 +90,5 @@ that send real mail through Ethereal are skipped unless `RUN_ETHEREAL=1`.
 
 ## Not done yet
 
-- Rate limiting on login and OTP (`src/middleware/ratelimit.middleware.ts` is a stub).
 - Key rotation without logging everyone out (key IDs and a JWKS endpoint).
 - Checking the `disabled` flag at login and refresh.

@@ -11,6 +11,11 @@ import { HealthController } from '@controller/health.controller.js';
 import { createAuthMiddleware } from '@middleware/auth.middleware.js';
 import CsrfMiddleware from '@middleware/csrf.middlware.js';
 import ValidationMiddleware from '@middleware/validation.middleware.js';
+import { createRateLimit } from '@middleware/ratelimit.middleware.js';
+import { MemoryTokenBucket, RedisTokenBucket, type ITokenBucket } from '@utils/ratelimit/token-bucket.js';
+import rateLimitConfig from '@config/ratelimit.config.js';
+import logger from '@utils/logging/logger.utils.js';
+import { Redis } from 'ioredis';
 
 const tokenUtils = createTokenUtils(AuthRepository);
 const otpProviderFactory = createOtpProviderFactory({
@@ -25,6 +30,14 @@ const healthController = new HealthController();
 
 const authMiddleware = createAuthMiddleware(tokenUtils);
 
+const tokenBucket: ITokenBucket = rateLimitConfig.redisUrl
+  ? new RedisTokenBucket(new Redis(rateLimitConfig.redisUrl, { maxRetriesPerRequest: 1 }))
+  : new MemoryTokenBucket();
+if (!rateLimitConfig.redisUrl && process.env.NODE_ENV === 'production') {
+  logger.warn('REDIS_URL is not set: rate limits are kept in memory and not shared between instances.');
+}
+const rateLimit = createRateLimit(tokenBucket);
+
 export { 
   authController, 
   authService, 
@@ -33,6 +46,8 @@ export {
   authMiddleware, 
   CsrfMiddleware,
   ValidationMiddleware,
+  rateLimit,
+  tokenBucket,
   AuthRepository, 
   tokenUtils, 
   PasswordUtils 

@@ -170,6 +170,8 @@ const PasswordUtils = await import('@utils/crypto/password.utils.js');
 const OtpUtils = await import('@utils/auth/otp.utils.js');
 const { createTokenUtils } = await import('@utils/crypto/token.utils.js');
 const AuthRepository = await import('@repositories/auth.repository.js');
+const { tokenBucket } = await import('@container.js');
+const { MemoryTokenBucket } = await import('@utils/ratelimit/token-bucket.js');
 const tokenUtils = createTokenUtils(AuthRepository.default);
 
 describe('Auth E2E Tests - Complete Authentication & Authorization Flow', () => {
@@ -179,6 +181,9 @@ describe('Auth E2E Tests - Complete Authentication & Authorization Flow', () => 
     beforeEach(() => {
         // Reset all mocks
         jest.clearAllMocks();
+
+        // Every test comes from the same IP: start each with full rate limit buckets
+        if (tokenBucket instanceof MemoryTokenBucket) tokenBucket.clear();
         
         // Create REAL Express app
         app = express.default();
@@ -588,6 +593,51 @@ describe('Auth E2E Tests - Complete Authentication & Authorization Flow', () => 
                     phone: '+15551234567',
                 })
                 .expect(400);
+        });
+    });
+
+    describe('Rate Limiting', () => {
+        it('should return 429 with Retry-After once an email runs out of login attempts', async () => {
+            const csrfResponse = await request(app)
+                .get('/api/auth/csrf-token')
+                .expect(200);
+            const csrfToken = extractCsrfToken(csrfResponse);
+            mockPrisma.userCredentials.findUnique.mockResolvedValue(null);
+
+            const attempt = () => request(app)
+                .post('/api/auth/login')
+                .set('Cookie', [`csrf-token=${csrfToken}`])
+                .set('X-CSRF-Token', csrfToken)
+                .send({ email: 'target@example.com', password: 'WrongPassword123!' });
+
+            // The per-email bucket holds 5 attempts
+            for (let i = 0; i < 5; i++) {
+                const response = await attempt();
+                expect(response.status).toBe(401);
+            }
+
+            const limited = await attempt();
+            expect(limited.status).toBe(429);
+            expect(limited.body.code).toBe('RATE_LIMITED');
+            expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+        });
+
+        it('should limit each email separately', async () => {
+            const csrfResponse = await request(app)
+                .get('/api/auth/csrf-token')
+                .expect(200);
+            const csrfToken = extractCsrfToken(csrfResponse);
+            mockPrisma.userCredentials.findUnique.mockResolvedValue(null);
+
+            const attempt = (email: string) => request(app)
+                .post('/api/auth/login')
+                .set('Cookie', [`csrf-token=${csrfToken}`])
+                .set('X-CSRF-Token', csrfToken)
+                .send({ email, password: 'WrongPassword123!' });
+
+            for (let i = 0; i < 5; i++) await attempt('first@example.com');
+            expect((await attempt('first@example.com')).status).toBe(429);
+            expect((await attempt('second@example.com')).status).toBe(401);
         });
     });
 
