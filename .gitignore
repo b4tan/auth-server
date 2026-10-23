@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+# Generated JWT keys and refresh pepper (src/scripts/generate.*.ts)
+keys/
+src/keys/
+*.pem
+.DS_Store

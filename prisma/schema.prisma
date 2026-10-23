@@ -1,0 +1,70 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  worker
+  admin
+  employer
+}
+
+model UserCredentials {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  phone         String    @unique
+  role          Role      @default(worker)
+  scope         String[]  @default([])
+  emailVerified Boolean   @default(false) @map("email_verified")
+  phoneVerified Boolean   @default(false) @map("phone_verified")
+  passwordHash  String 
+  disabled      Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt      @map("updated_at")
+
+
+  refreshSessions RefreshSession[]
+
+  @@map("user_credentials") // map to db table
+}
+
+model RefreshSession {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user UserCredentials @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])      // index for faster search
+  @@index([expiresAt])
+  @@map("refresh_sessions") // map to db table 
+
+}
+
+enum OtpStatus {
+  pending
+  verified
+  expired
+  failed
+}
+
+model EmailOtp {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  codeHash    String   @map("code_hash") // since we roll and generate our own codes
+  status      OtpStatus @default(pending)
+  expiresAt   DateTime @map("expires_at")
+  attempts    Int      @default(0)
+  lockedUntil DateTime? @map("locked_until")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("email_otp")
+}

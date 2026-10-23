@@ -1,0 +1,52 @@
+{
+  "compilerOptions": {
+
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@config/*": ["src/config/*"],
+      "@repositories/*": ["src/repositories/*"],
+      "@middleware/*": ["src/middleware/*"],
+      "@controller/*": ["src/controller/*"],
+      "@routes/*": ["src/routes/*"],
+      "@utils/*": ["src/utils/*"],
+      "@schemas/*": ["src/schemas/*"],
+      "@service/*": ["src/service/*"],
+      "@providers/*": ["src/providers/*"],
+      "@data/*": ["src/data/*"],
+      "@lib/*": ["src/lib/*"],
+      "@errors/*": ["src/errors/*"],
+      "@container.js": ["src/container.ts"],
+      "@container/*": ["src/container/*"],
+      "@server.js": ["src/server.ts"],
+      "@test-utils/*": ["tests/utils/*"],
+    },
+
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "esnext",
+    "types": ["node", "jest"],
+    "typeRoots": ["./node_modules/@types"],
+  
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    "strict": true,
+    "jsx": "react-jsx",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+  },
+  "include": [
+    "src/**/*", 
+    "src/types/**/*",
+    "tests/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "models"]
+}
